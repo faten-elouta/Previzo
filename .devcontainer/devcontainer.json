@@ -1,0 +1,7 @@
+{
+    "name": "previzo-edito-sim",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "dev",
+    "workspaceFolder": "/workspace",
+    "remoteUser": "root"
+}

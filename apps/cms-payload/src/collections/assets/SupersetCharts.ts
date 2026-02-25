@@ -1,14 +1,15 @@
 import type { CollectionConfig } from 'payload'
 import { GROUPS } from '../content-groups/groups'
-import { POLICIES } from '@/strategies/access-control/policies'
+import { AC_POLICIES } from '@/strategies/access-control/policies'
+import { INTEG_POLICIES } from '@/strategies/integrity/policies'
 
 export const SupersetCharts: CollectionConfig = {
   slug: 'superset-charts',
   access: {
-    read: POLICIES.canReadMedia(),
-    create: POLICIES.canManageMedia(),
-    update: POLICIES.canManageMedia(),
-    delete: POLICIES.canManageMedia(),
+    read: AC_POLICIES.canReadMedia(),
+    create: AC_POLICIES.canManageMedia(),
+    update: AC_POLICIES.canManageMedia(),
+    delete: AC_POLICIES.canManageMedia() && INTEG_POLICIES.canDeleteChart(),
   },
   admin: {
     group: GROUPS.Assets
@@ -24,6 +25,5 @@ export const SupersetCharts: CollectionConfig = {
       type: 'text',
       required: true,
     }
-  ],
-  upload: true,
+  ]
 }

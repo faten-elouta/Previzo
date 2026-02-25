@@ -1,6 +1,7 @@
-import { POLICIES } from '@/strategies/access-control/policies';
+import { AC_POLICIES } from '@/strategies/access-control/policies';
 import { GROUPS } from '../content-groups/groups';
 import { CollectionConfig } from 'payload';
+import { ReportBlock } from './components/ReportBlock';
 
 export const Reports: CollectionConfig = {
     slug: 'reports',
@@ -19,10 +20,11 @@ export const Reports: CollectionConfig = {
         group: GROUPS.Content
     },
     access: {
-        read: POLICIES.canReadReports(),
-        create: POLICIES.canEditReports(),
-        update: POLICIES.canEditReports(),
-        delete: POLICIES.canEditReports(),
+        read: AC_POLICIES.canReadReports(),
+        create: AC_POLICIES.canEditReports(),
+        update: AC_POLICIES.canEditReports(),
+        delete: AC_POLICIES.canEditReports(),
+        readVersions: AC_POLICIES.canReadReports()
     },
     fields: [
         {
@@ -50,11 +52,12 @@ export const Reports: CollectionConfig = {
             },
             type: 'blocks',
             blocks: [
-                
+                ReportBlock
             ]
         }
     ],
     versions: {
         drafts: true,
+        maxPerDoc: 10
     }
 };

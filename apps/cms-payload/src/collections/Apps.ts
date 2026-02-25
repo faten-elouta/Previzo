@@ -1,5 +1,5 @@
 import { FIELD_POLICIES } from '@/strategies/access-control/field-policies';
-import { POLICIES } from '@/strategies/access-control/policies';
+import { AC_POLICIES } from '@/strategies/access-control/policies';
 import { CollectionConfig } from 'payload';
 import { GROUPS } from './content-groups/groups';
 
@@ -14,10 +14,10 @@ export const Apps: CollectionConfig = {
         group: GROUPS.Admin
     },
     access: {
-        read: POLICIES.canManageApps(),
-        create: POLICIES.canManageApps(),
-        update: POLICIES.canManageApps(),
-        delete: POLICIES.canManageApps(),  
+        read: AC_POLICIES.canManageApps(),
+        create: AC_POLICIES.canManageApps(),
+        update: AC_POLICIES.canManageApps(),
+        delete: AC_POLICIES.canManageApps(),  
     },
     fields: [
         {

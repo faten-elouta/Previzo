@@ -23,21 +23,21 @@ export const ReportBlock: Block = {
             required: true,
         },
         {
-            name: 'head-text',
+            name: 'headText',
             label: {
                 en: 'Head Text',
                 fr: 'Texte d\'en-tête',
             },
             type: 'text',
         },
-        // {
-        //     name: 'chart',
-        //     label: {
-        //         en: 'Chart',
-        //         fr: 'Graphique',
-        //     },
-        //     type: 'relationship',
-        //     relationTo: 'superset-charts',
-        // }
+        {
+            name: 'chart',
+            label: {
+                en: 'Chart',
+                fr: 'Graphique',
+            },
+            type: 'relationship',
+            relationTo: 'superset-charts',
+        }
     ]
 }

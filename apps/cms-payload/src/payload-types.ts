@@ -205,10 +205,30 @@ export interface Report {
     };
     [k: string]: unknown;
   } | null;
-  content?: unknown[] | null;
+  content?:
+    | {
+        title: string;
+        headText?: string | null;
+        chart?: (number | null) | SupersetChart;
+        id?: string | null;
+        blockName?: string | null;
+        blockType: 'report';
+      }[]
+    | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "superset-charts".
+ */
+export interface SupersetChart {
+  id: number;
+  alt: string;
+  supersetChartId: string;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -248,26 +268,6 @@ export interface App {
   apiKey?: string | null;
   apiKeyIndex?: string | null;
   collection: 'apps';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "superset-charts".
- */
-export interface SupersetChart {
-  id: number;
-  alt: string;
-  supersetChartId: string;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -412,7 +412,19 @@ export interface MediaSelect<T extends boolean = true> {
 export interface ReportsSelect<T extends boolean = true> {
   title?: T;
   abstract?: T;
-  content?: T | {};
+  content?:
+    | T
+    | {
+        report?:
+          | T
+          | {
+              title?: T;
+              headText?: T;
+              chart?: T;
+              id?: T;
+              blockName?: T;
+            };
+      };
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -447,15 +459,6 @@ export interface SupersetChartsSelect<T extends boolean = true> {
   supersetChartId?: T;
   updatedAt?: T;
   createdAt?: T;
-  url?: T;
-  thumbnailURL?: T;
-  filename?: T;
-  mimeType?: T;
-  filesize?: T;
-  width?: T;
-  height?: T;
-  focalX?: T;
-  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

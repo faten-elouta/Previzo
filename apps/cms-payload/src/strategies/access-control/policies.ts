@@ -1,7 +1,11 @@
 import { Access } from "payload";
 
-export const POLICIES = {
+export const AC_POLICIES = {
     canReadReports: (): Access => ({ req: { user } }) => {
+        if (user?.collection === 'users') {
+            // Les utilisateurs sont considérés comme des administrateurs et peuvent lire les rapports
+            return true;
+        }
         // Apps with read-only or read-write access can read reports
         if (user?.collection === 'apps') {
             if (user?.permissions?.readOnly === true || user?.permissions?.contentReadOnly === true) {
@@ -9,11 +13,9 @@ export const POLICIES = {
             }
         }
 
-        if (user?.collection === 'users') {
-            // Les utilisateurs sont considérés comme des administrateurs et peuvent lire les rapports
-            return true;
-        }
-        return false;
+        return {
+            _status: { equals: 'published' }
+        };
     },
     canEditReports: (): Access => ({ req: { user } }) => {
         // Apps with read-write access can edit reports
@@ -21,6 +23,11 @@ export const POLICIES = {
             if (user?.permissions?.readWrite === true || user?.permissions?.contentReadWrite === true) {
                 return true;
             }
+        }
+
+        if (user?.collection === 'users') {
+            // Les utilisateurs sont considérés comme des administrateurs et peuvent éditer les rapports (Dev only)
+            return process.env.NODE_ENV === 'development';
         }
         return false;
     },

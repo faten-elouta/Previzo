@@ -12,8 +12,7 @@
     },
     "remoteUser": "root",
     "forwardPorts": [
-        "cms:1337",
-        "cms:5173"
+        "cms:3000"
     ],
     "customizations": {
         "vscode": {

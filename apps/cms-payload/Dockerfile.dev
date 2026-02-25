@@ -1,0 +1,33 @@
+# To use this Dockerfile, you have to set `output: 'standalone'` in your next.config.mjs file.
+# From https://github.com/vercel/next.js/blob/canary/examples/with-docker/Dockerfile
+
+# Aligner avec l'image de base pour la production (environnement isomorphique)
+FROM node:22.17.0-alpine AS base
+
+# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Activation de pnpm pour l'installation des dépendances
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:/app/node_modules/.bin:$PATH"
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# AJOUT : Installation globale de cross-env
+RUN pnpm add -g cross-env
+
+# On ne copie que les lockfiles pour le cache Docker
+COPY package.json pnpm-lock.yaml* ./
+
+# Installation des dépendances avec pnpm
+RUN pnpm i --frozen-lockfile
+
+# On monte le reste du code
+COPY . .
+
+# Donner les permissions d'exécution au script d'entrée
+RUN chmod +x ./docker/entrypoint.sh
+
+EXPOSE 3000
+
+ENTRYPOINT [ "sh", "./docker/entrypoint.sh" ]

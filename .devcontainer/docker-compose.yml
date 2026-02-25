@@ -24,28 +24,23 @@ services:
 
   cms:
     build:
-      context: ../apps/cms-strapi
-      dockerfile: Dockerfile
+      context: ../apps/cms-payload
+      dockerfile: Dockerfile.dev
     volumes:
-      - ../apps/cms-strapi/config:/opt/config
-      - ../apps/cms-strapi/src:/opt/src
-      - ../apps/cms-strapi/package.json:/opt/package.json
-      - ../apps/cms-strapi/pnpm-lock.yaml:/opt/pnpm-lock.yaml
-      - ../apps/cms-strapi/public/uploads:/opt/public/uploads
+      - ../apps/cms-payload:/app
+      # Protection des répertoires internes
+      - /app/node_modules
+      - /app/.next
+    tty: true
+    stdin_open: true
     env_file:
       - .env
     environment:
-      - DATABASE_CLIENT=$CMS_DATABASE_CLIENT
-      - DATABASE_HOST=$CMS_DATABASE_HOST
-      - DATABASE_PORT=$CMS_DATABASE_PORT
-      - DATABASE_NAME=$CMS_DATABASE_NAME
-      - DATABASE_USERNAME=$CMS_DATABASE_USERNAME
-      - DATABASE_PASSWORD=$CMS_DATABASE_PASSWORD
-      - JWT_SECRET=$CMS_JWT_SECRET
-      - API_TOKEN_SALT=$CMS_API_TOKEN_SALT
-      - ADMIN_JWT_SECRET=$CMS_ADMIN_JWT_SECRET
-      - APP_KEYS=$CMS_APP_KEYS
-      - TRANSFER_TOKEN_SALT=$CMS_TRANSFER_TOKEN_SALT
+      - PATH=$PATH:/app/node_modules/.bin
+      - DATABASE_URL=postgres://$CMS_DATABASE_USERNAME:$CMS_DATABASE_PASSWORD@database:5432/$CMS_DATABASE_NAME
+      - PAYLOAD_SECRET=$CMS_PAYLOAD_SECRET
+      - NEXT_PUBLIC_SERVER_URL=$CMS_NEXT_PUBLIC_SERVER_URL
+      - PAYLOAD_DB_PUSH=$CMS_PAYLOAD_DB_PUSH
 
 volumes:
   postgres-data:

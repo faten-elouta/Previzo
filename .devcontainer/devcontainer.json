@@ -3,5 +3,23 @@
     "dockerComposeFile": "docker-compose.yml",
     "service": "dev",
     "workspaceFolder": "/workspace",
-    "remoteUser": "root"
+    "features": {
+        "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+            "version": "latest",
+            "enableNonRootDocker": "false",
+            "moby": "false"
+        }
+    },
+    "remoteUser": "root",
+    "forwardPorts": [
+        "cms:1337",
+        "cms:5173"
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-azuretools.vscode-containers"
+            ]
+        }
+    }
 }

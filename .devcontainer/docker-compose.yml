@@ -3,17 +3,49 @@ services:
     build: .
     volumes:
       - ..:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+
   database:
     image: postgres:18
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: root
+      - POSTGRES_USER=$POSTGRES_USER
+      - POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+      - SUPERSET_DB_NAME=$SUPERSET_DB_NAME
+      - SUPERSET_DB_USER=$SUPERSET_DB_USER
+      - SUPERSET_DB_PASSWORD=$SUPERSET_DB_PASSWORD
+      - CMS_DATABASE_NAME=$CMS_DATABASE_NAME
+      - CMS_DATABASE_USERNAME=$CMS_DATABASE_USERNAME
+      - CMS_DATABASE_PASSWORD=$CMS_DATABASE_PASSWORD
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-  # cms:
-  #   build:
-  #     context: ./cms
-  #     dockerfile: Dockerfile
+      - postgres-data:/var/lib/postgresql
+      - ./database/init.sh:/docker-entrypoint-initdb.d/init.sh
+
+  cms:
+    build:
+      context: ../apps/cms-strapi
+      dockerfile: Dockerfile
+    volumes:
+      - ../apps/cms-strapi/config:/opt/config
+      - ../apps/cms-strapi/src:/opt/src
+      - ../apps/cms-strapi/package.json:/opt/package.json
+      - ../apps/cms-strapi/pnpm-lock.yaml:/opt/pnpm-lock.yaml
+      - ../apps/cms-strapi/public/uploads:/opt/public/uploads
+    env_file:
+      - .env
+    environment:
+      - DATABASE_CLIENT=$CMS_DATABASE_CLIENT
+      - DATABASE_HOST=$CMS_DATABASE_HOST
+      - DATABASE_PORT=$CMS_DATABASE_PORT
+      - DATABASE_NAME=$CMS_DATABASE_NAME
+      - DATABASE_USERNAME=$CMS_DATABASE_USERNAME
+      - DATABASE_PASSWORD=$CMS_DATABASE_PASSWORD
+      - JWT_SECRET=$CMS_JWT_SECRET
+      - API_TOKEN_SALT=$CMS_API_TOKEN_SALT
+      - ADMIN_JWT_SECRET=$CMS_ADMIN_JWT_SECRET
+      - APP_KEYS=$CMS_APP_KEYS
+      - TRANSFER_TOKEN_SALT=$CMS_TRANSFER_TOKEN_SALT
 
 volumes:
   postgres-data:

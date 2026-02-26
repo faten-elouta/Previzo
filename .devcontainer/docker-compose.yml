@@ -18,6 +18,9 @@ services:
       - CMS_DATABASE_NAME=$CMS_DATABASE_NAME
       - CMS_DATABASE_USERNAME=$CMS_DATABASE_USERNAME
       - CMS_DATABASE_PASSWORD=$CMS_DATABASE_PASSWORD
+      - OLAP_SANDBOX_DB_NAME=$OLAP_SANDBOX_DB_NAME
+      - OLAP_SANDBOX_DB_USER=$OLAP_SANDBOX_DB_USER
+      - OLAP_SANDBOX_DB_PASSWORD=$OLAP_SANDBOX_DB_PASSWORD
     volumes:
       - postgres-data:/var/lib/postgresql
       - ./database/init.sh:/docker-entrypoint-initdb.d/init.sh
@@ -42,5 +45,33 @@ services:
       - NEXT_PUBLIC_SERVER_URL=$CMS_NEXT_PUBLIC_SERVER_URL
       - PAYLOAD_DB_PUSH=$CMS_PAYLOAD_DB_PUSH
 
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: always
+
+  superset:
+    build:
+      context: ./superset
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - SUPERSET_SECRET_KEY=$SUPERSET_SECRET_KEY
+      - SUPERSET_REDIS_HOST=valkey
+      - SUPERSET_REDIS_PORT=6379
+      - SUPERSET_SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://$SUPERSET_DB_USER:$SUPERSET_DB_PASSWORD@database:5432/$SUPERSET_DB_NAME?options=-csearch_path%3D$SUPERSET_DB_SCHEMA
+      # Embedding
+      - SUPERSET_ENABLE_CORS=true
+      - SUPERSET_FEATURE_EMBEDDED_SUPERSET=$SUPERSET_FEATURE_EMBEDDED_SUPERSET
+      - SUPERSET_CONFIG_PATH=/app/superset_config.py
+    volumes:
+      - superset-data:/app/superset_home
+      - ./superset/superset_config.py:/app/superset_config.py
+    depends_on:
+      - database
+      - valkey
+
 volumes:
   postgres-data:
+  superset-data:

@@ -12,7 +12,9 @@
     },
     "remoteUser": "root",
     "forwardPorts": [
-        "cms:3000"
+        "cms:3000",
+        "database:5432",
+        "superset:8088"
     ],
     "customizations": {
         "vscode": {

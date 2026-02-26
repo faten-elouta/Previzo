@@ -26,3 +26,5 @@ superset init
 ```
 
 4. Enjoy : login with admin/admin
+
+5. Ajouter la source de données `olap_sandbox` (schéma `public`)

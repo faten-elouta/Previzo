@@ -50,7 +50,7 @@ export const Apps: CollectionConfig = {
                 }
             },
             access: {
-                read: () => false, // Empêche la lecture via l'API pour des raisons de sécurité
+                read: FIELD_POLICIES.canManageAPIKey(), // Empêche la lecture via l'API pour des raisons de sécurité
                 update: FIELD_POLICIES.canManageAPIKey(), // Seuls les utilisateurs (administrateurs) peuvent activer ou désactiver la clé API
             }
         },

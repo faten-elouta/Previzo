@@ -1,6 +1,4 @@
 import { Access } from "payload";
-import selectReportWithChart from "./queries/select-report-with-chart";
-import { sql } from "@payloadcms/db-postgres";
 import SELECT_REPORT_WITH_CHART from "./queries/select-report-with-chart";
 
 export const INTEG_POLICIES = {

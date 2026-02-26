@@ -13,9 +13,10 @@ export const AC_POLICIES = {
             }
         }
 
-        return {
-            _status: { equals: 'published' }
-        };
+        // return {
+        //     _status: { equals: 'published' }
+        // };
+        return false;
     },
     canEditReports: (): Access => ({ req: { user } }) => {
         // Apps with read-write access can edit reports

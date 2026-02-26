@@ -15,7 +15,7 @@ const response = await fetch('http://localhost:3000/api/reports', {
 
 ## Comment tester avec un script en Python (Payload CMS)
 
-Lancer le script Python `test_read_reports.py` pour vérifier la connexion à l'API et la récupération des données. Assurez-vous d'avoir installé les dépendances nécessaires (comme `httpx`) et d'avoir configuré les variables d'environnement pour l'URL de l'API et la clé d'API.
+Lancer le script Python `test_read_reports.py` pour vérifier la connexion à l'API et la récupération des données. Assurez-vous d'avoir installé les dépendances nécessaires (comme `httpx`) et d'avoir mis à jour la constante `API_KEY` avec la clé d'API générée pour votre application.
 
 ```bash
 python -m venv .venv

@@ -1,4 +1,13 @@
 services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+
   dev:
     build: .
     volumes:
@@ -75,3 +84,4 @@ services:
 volumes:
   postgres-data:
   superset-data:
+  ollama_data:

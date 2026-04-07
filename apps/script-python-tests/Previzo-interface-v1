@@ -1,0 +1,2055 @@
+import os
+import io
+import csv
+import json
+from html import escape
+
+import httpx
+from dotenv import load_dotenv
+from flask import Flask, request, render_template_string, jsonify
+
+load_dotenv()
+
+app = Flask(__name__)
+
+APP_PORT = int(os.getenv("APP_PORT", "5000"))
+
+# ============================================================
+# Configuration Superset
+# ============================================================
+
+SUPERSET_PUBLIC_URL = os.getenv(
+    "SUPERSET_PUBLIC_URL", "https://previzodashboard.brgm.fr"
+).rstrip("/")
+SUPERSET_API_URL = os.getenv(
+    "SUPERSET_API_URL", "https://previzodashboard.brgm.fr"
+).rstrip("/")
+SUPERSET_USER = os.getenv("SUPERSET_USER", "f.elouta@brgm.fr")
+SUPERSET_PASSWORD = os.getenv("SUPERSET_PASSWORD", "f.elouta@brgm.fr")
+LOCAL_APP_ORIGIN = os.getenv("LOCAL_APP_ORIGIN", f"http://localhost:{APP_PORT}")
+
+LOGO_URL = os.getenv(
+    "PREVIZO_LOGO_URL",
+    "https://media.licdn.com/dms/image/v2/D4E16AQGReO7X40YGWA/profile-displaybackgroundimage-shrink_200_800/B4EZok0dewIwAU-/0/1761554324091?e=2147483647&v=beta&t=cuWKKbZzhjGiXOrSM3hiuz2IdnIDqm3PCQ9lmKUcEUk",
+)
+
+# ============================================================
+# CAPTEURS (Accueil + sous dashboards)
+# ============================================================
+
+CAPTEURS_HOME_EMBEDDED_ID = os.getenv(
+    "CAPTEURS_HOME_EMBEDDED_ID",
+    "44f8843f-47ed-4fd1-bfc7-5a0a30e38b7e",
+)
+
+CAPTEURS_HOME_DASHBOARD_NUMERIC_ID = os.getenv(
+    "CAPTEURS_HOME_DASHBOARD_NUMERIC_ID",
+    "35",
+)
+
+CAPTEURS_HYDRIQUES_EMBEDDED_ID = os.getenv(
+    "CAPTEURS_HYDRIQUES_EMBEDDED_ID",
+    "52a4b1ed-d9a6-486e-9574-98e36e03d84b",
+)
+
+CAPTEURS_HYDRIQUES_DASHBOARD_NUMERIC_ID = os.getenv(
+    "CAPTEURS_HYDRIQUES_DASHBOARD_NUMERIC_ID",
+    "26",
+)
+
+CAPTEURS_ENERGIE_EMBEDDED_ID = os.getenv(
+    "CAPTEURS_ENERGIE_EMBEDDED_ID",
+    "8555ec0f-7449-407d-9830-9166d784cb8f",
+)
+
+CAPTEURS_ENERGIE_DASHBOARD_NUMERIC_ID = os.getenv(
+    "CAPTEURS_ENERGIE_DASHBOARD_NUMERIC_ID",
+    "28",
+)
+
+CAPTEURS_SIGNAL_EMBEDDED_ID = os.getenv(
+    "CAPTEURS_SIGNAL_EMBEDDED_ID",
+    "2a67d60c-4420-4df5-a258-2e55d7485ad0",
+)
+
+CAPTEURS_SIGNAL_DASHBOARD_NUMERIC_ID = os.getenv(
+    "CAPTEURS_SIGNAL_DASHBOARD_NUMERIC_ID",
+    "27",
+)
+
+# ============================================================
+# PIEZOMETRES
+# ============================================================
+
+PIEZO_GLOBAL_EMBEDDED_ID = os.getenv(
+    "PIEZO_GLOBAL_EMBEDDED_ID",
+    "cb91607f-327d-4bf1-82bd-4af416032ee0",
+)
+
+PIEZO_GLOBAL_DASHBOARD_NUMERIC_ID = os.getenv(
+    "PIEZO_GLOBAL_DASHBOARD_NUMERIC_ID",
+    "34",
+)
+
+PIEZO_HYDRO_EMBEDDED_ID = os.getenv(
+    "PIEZO_HYDRO_EMBEDDED_ID",
+    "66319268-5132-4581-a7fa-6ad157e99a06",
+)
+
+PIEZO_HYDRO_DASHBOARD_NUMERIC_ID = os.getenv(
+    "PIEZO_HYDRO_DASHBOARD_NUMERIC_ID",
+    "33",
+)
+
+# ============================================================
+# PREVISIONS
+# ============================================================
+
+PREVISION_GLOBAL_EMBEDDED_ID = os.getenv(
+    "PREVISION_GLOBAL_EMBEDDED_ID",
+    "f6b2da0c-c742-4f8b-b833-b97381665d03",
+)
+
+PREVISION_GLOBAL_DASHBOARD_NUMERIC_ID = os.getenv(
+    "PREVISION_GLOBAL_DASHBOARD_NUMERIC_ID",
+    "36",
+)
+
+PREVISION_15J_EMBEDDED_ID = os.getenv(
+    "PREVISION_15J_EMBEDDED_ID",
+    "6ae5911d-a346-4613-9c54-ad05581041a8",
+)
+
+PREVISION_15J_DASHBOARD_NUMERIC_ID = os.getenv(
+    "PREVISION_15J_DASHBOARD_NUMERIC_ID",
+    "38",
+)
+
+PREVISION_6M_EMBEDDED_ID = os.getenv(
+    "PREVISION_6M_EMBEDDED_ID",
+    "514356ec-2533-4d61-876c-43a8f0ee8a65",
+)
+
+PREVISION_6M_DASHBOARD_NUMERIC_ID = os.getenv(
+    "PREVISION_6M_DASHBOARD_NUMERIC_ID",
+    "37",
+)
+
+# ============================================================
+# CLIMAT
+# ============================================================
+
+CLIMAT_GLOBAL_EMBEDDED_ID = os.getenv(
+    "CLIMAT_GLOBAL_EMBEDDED_ID",
+    "8150c0a5-8bb2-449b-8234-c62fe0b59c4f",
+)
+
+CLIMAT_GLOBAL_DASHBOARD_NUMERIC_ID = os.getenv(
+    "CLIMAT_GLOBAL_DASHBOARD_NUMERIC_ID",
+    "40",
+)
+
+DASHBOARDS = {
+    1: {
+        "title": "Suivi en temps réel des capteurs de hauteur d’eau",
+        "subtitle": "Capteurs d’eau",
+        "mode": "embed_group",
+        "dashboard_numeric_id": CAPTEURS_HOME_DASHBOARD_NUMERIC_ID,
+        "embedded_dashboard_id": CAPTEURS_HOME_EMBEDDED_ID,
+        "subtabs": [
+            {
+                "key": "main",
+                "label": "Vue principale",
+                "embedded_dashboard_id": CAPTEURS_HOME_EMBEDDED_ID,
+                "dashboard_numeric_id": CAPTEURS_HOME_DASHBOARD_NUMERIC_ID,
+            },
+            {
+                "key": "tab1",
+                "label": "Mesures hydriques",
+                "embedded_dashboard_id": CAPTEURS_HYDRIQUES_EMBEDDED_ID,
+                "dashboard_numeric_id": CAPTEURS_HYDRIQUES_DASHBOARD_NUMERIC_ID,
+            },
+            {
+                "key": "tab2",
+                "label": "Autonomie énergétique",
+                "embedded_dashboard_id": CAPTEURS_ENERGIE_EMBEDDED_ID,
+                "dashboard_numeric_id": CAPTEURS_ENERGIE_DASHBOARD_NUMERIC_ID,
+            },
+            {
+                "key": "tab3",
+                "label": "Qualité signal",
+                "embedded_dashboard_id": CAPTEURS_SIGNAL_EMBEDDED_ID,
+                "dashboard_numeric_id": CAPTEURS_SIGNAL_DASHBOARD_NUMERIC_ID,
+            },
+        ],
+    },
+    2: {
+        "title": "Suivi des piézomètres et des mesures associées",
+        "subtitle": "Piézomètres",
+        "mode": "embed_group",
+        "dashboard_numeric_id": PIEZO_GLOBAL_DASHBOARD_NUMERIC_ID,
+        "embedded_dashboard_id": PIEZO_GLOBAL_EMBEDDED_ID,
+        "subtabs": [
+            {
+                "key": "global",
+                "label": "Vue globale",
+                "embedded_dashboard_id": PIEZO_GLOBAL_EMBEDDED_ID,
+                "dashboard_numeric_id": PIEZO_GLOBAL_DASHBOARD_NUMERIC_ID,
+            },
+            {
+                "key": "hydro",
+                "label": "Analyse hydrologique",
+                "embedded_dashboard_id": PIEZO_HYDRO_EMBEDDED_ID,
+                "dashboard_numeric_id": PIEZO_HYDRO_DASHBOARD_NUMERIC_ID,
+            },
+        ],
+    },
+    3: {
+        "title": "Tableau de bord climatique du projet PrévizO",
+        "subtitle": "Climat",
+        "mode": "embed_group",
+        "dashboard_numeric_id": CLIMAT_GLOBAL_DASHBOARD_NUMERIC_ID,
+        "embedded_dashboard_id": CLIMAT_GLOBAL_EMBEDDED_ID,
+        "subtabs": [
+            {
+                "key": "global",
+                "label": "Vue globale",
+                "embedded_dashboard_id": CLIMAT_GLOBAL_EMBEDDED_ID,
+                "dashboard_numeric_id": CLIMAT_GLOBAL_DASHBOARD_NUMERIC_ID,
+            },
+        ],
+    },
+    4: {
+        "title": "Prévisions et niveaux de vigilance hydrologique",
+        "subtitle": "Prévisions",
+        "mode": "embed_group",
+        "dashboard_numeric_id": PREVISION_GLOBAL_DASHBOARD_NUMERIC_ID,
+        "embedded_dashboard_id": PREVISION_GLOBAL_EMBEDDED_ID,
+        "subtabs": [
+            {
+                "key": "global",
+                "label": "Vue globale",
+                "embedded_dashboard_id": PREVISION_GLOBAL_EMBEDDED_ID,
+                "dashboard_numeric_id": PREVISION_GLOBAL_DASHBOARD_NUMERIC_ID,
+            },
+            {
+                "key": "prevision_15j",
+                "label": "Prévisions à 15 jours",
+                "embedded_dashboard_id": PREVISION_15J_EMBEDDED_ID,
+                "dashboard_numeric_id": PREVISION_15J_DASHBOARD_NUMERIC_ID,
+            },
+            {
+                "key": "prevision_6m",
+                "label": "Prévisions à 6 mois",
+                "embedded_dashboard_id": PREVISION_6M_EMBEDDED_ID,
+                "dashboard_numeric_id": PREVISION_6M_DASHBOARD_NUMERIC_ID,
+            },
+        ],
+    },
+    
+}
+
+# ============================================================
+# CMS
+# ============================================================
+
+API_URL = os.getenv("CMS_BASE_URL", "http://cms:3000").rstrip("/")
+API_KEY = os.getenv("CMS_API_KEY", "56098bba-22ec-45b1-ba6a-63939f1308b8")
+CMS_REPORTS_ENDPOINT = f"{API_URL}/api/reports"
+
+# ============================================================
+# Données brutes
+# ============================================================
+
+CAPTEURS_RAW = """capteur\teui\tlatitude\tlongitude
+Elsys Capteur de distance Ultrasonic_Filet près du lac des peupleraies\tA81758FFFE0CE95D\t47.37653\t0.737094
+Elsys Capteur de distance Ultrasonic_à définir\tA81758FFFE0CE95C\t47.373207\t0.716268
+Elsys Capteur de distance Ultrasonic_Pont_Saint_Avertin_new\tA81758FFFE0CE960\t\t
+Elsys Capteur de distance Ultrasonic_passerelle_Arcole\tA81758FFFE0CE95C\t47.373207\t0.716268
+Elsys Capteur de distance Ultrasonic_Pont Saint Avertin\tA81758FFFE0CE95F\t47.369804\t0.723547
+Capteur de distance Ultrasonic_Filet près du lac des peupleraies\tA81758FFFE0CE95D\t47.37653\t0.737094
+"""
+
+PIEZO_RAW = """piezo\turn_bss\tx\ty
+01727X0123/S3\thttp://services.ades.eaufrance.fr/pointeau/01727X0123/S3\t-1.587062465\t48.8379768
+02034X0082/PZ\thttp://services.ades.eaufrance.fr/pointeau/02034X0082/PZ\t-3.250335027\t48.74139107
+02047X0072/PZ\thttp://services.ades.eaufrance.fr/pointeau/02047X0072/PZ\t-3.0287928\t48.60693952
+02101X0044/P\thttp://services.ades.eaufrance.fr/pointeau/02101X0044/P\t-1.025439495\t48.73802788
+02105X0025/F3\thttp://services.ades.eaufrance.fr/pointeau/02105X0025/F3\t-1.05617687\t48.67146596
+"""
+
+METEO_RAW = """meteo\tnom_station\tlongitude\tlatitude\taltitude_m
+22005003\tBELLE-ISLE-EN-TERRE\t-3.387500\t48.550000\t158
+22016001\tILE-DE-BREHAT\t-3.004500\t48.855167\t25
+22372001\tST BRIEUC\t-2.853167\t48.536500\t135
+37003001\tAMBOISE\t0.976833\t47.393833\t119
+37179001\tTOURS\t0.727333\t47.444500\t108
+41018001\tBLOIS - VILLE\t1.337500\t47.572000\t69
+"""
+
+# ============================================================
+# Helpers parsing
+# ============================================================
+
+
+def to_float(value):
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    try:
+        return float(s.replace(",", "."))
+    except ValueError:
+        return None
+
+
+def parse_tsv(tsv_text):
+    reader = csv.DictReader(io.StringIO(tsv_text.strip()), delimiter="\t")
+    return list(reader)
+
+
+def build_sensor_dataset():
+    dataset = []
+
+    for row in parse_tsv(CAPTEURS_RAW):
+        lat = to_float(row.get("latitude"))
+        lon = to_float(row.get("longitude"))
+        if lat is None or lon is None:
+            continue
+        dataset.append(
+            {
+                "type": "capteur",
+                "name": row.get("capteur"),
+                "code": row.get("eui"),
+                "url": None,
+                "latitude": lat,
+                "longitude": lon,
+                "altitude_m": None,
+            }
+        )
+
+    for row in parse_tsv(PIEZO_RAW):
+        lat = to_float(row.get("y"))
+        lon = to_float(row.get("x"))
+        if lat is None or lon is None:
+            continue
+        dataset.append(
+            {
+                "type": "piezo",
+                "name": row.get("piezo"),
+                "code": row.get("piezo"),
+                "url": row.get("urn_bss"),
+                "latitude": lat,
+                "longitude": lon,
+                "altitude_m": None,
+            }
+        )
+
+    for row in parse_tsv(METEO_RAW):
+        lat = to_float(row.get("latitude"))
+        lon = to_float(row.get("longitude"))
+        if lat is None or lon is None:
+            continue
+
+        altitude = row.get("altitude_m")
+        altitude_m = None
+        if altitude not in (None, ""):
+            try:
+                altitude_m = int(float(altitude))
+            except ValueError:
+                altitude_m = None
+
+        dataset.append(
+            {
+                "type": "meteo",
+                "name": row.get("nom_station"),
+                "code": row.get("meteo"),
+                "url": None,
+                "latitude": lat,
+                "longitude": lon,
+                "altitude_m": altitude_m,
+            }
+        )
+
+    return dataset
+
+
+SENSOR_DATASET = build_sensor_dataset()
+
+# ============================================================
+# Indicateurs
+# ============================================================
+
+
+def compute_station_stats(dataset):
+    capteurs = sum(1 for x in dataset if x["type"] == "capteur")
+    piezos = sum(1 for x in dataset if x["type"] == "piezo")
+    meteo = sum(1 for x in dataset if x["type"] == "meteo")
+    total = len(dataset)
+
+    ratio_total = min(100, round((total / 20) * 100)) if total else 0
+    diversity = round((((capteurs > 0) + (piezos > 0) + (meteo > 0)) / 3) * 100)
+    situation_score = round((ratio_total * 0.55) + (diversity * 0.45))
+
+    if situation_score < 25:
+        level = "Normal"
+        color = "#22c55e"
+    elif situation_score < 50:
+        level = "Vigilance"
+        color = "#f59e0b"
+    elif situation_score < 75:
+        level = "Alerte"
+        color = "#f97316"
+    else:
+        level = "Crise"
+        color = "#dc2626"
+
+    return {
+        "capteurs": capteurs,
+        "piezos": piezos,
+        "meteo": meteo,
+        "total": total,
+        "situation_score": situation_score,
+        "level": level,
+        "color": color,
+    }
+
+
+STATION_STATS = compute_station_stats(SENSOR_DATASET)
+
+# ============================================================
+# CMS helpers
+# ============================================================
+
+
+def get_cms_headers():
+    return {
+        "Accept": "application/json",
+        "Authorization": f"apps API-Key {API_KEY}",
+    }
+
+
+def fetch_reports():
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(CMS_REPORTS_ENDPOINT, headers=get_cms_headers())
+            response.raise_for_status()
+            data = response.json()
+
+        docs = data.get("docs", [])
+        reports = []
+
+        for doc in docs:
+            reports.append(
+                {
+                    "id": doc.get("id"),
+                    "title": doc.get("title", "Sans titre"),
+                    "abstract": doc.get("abstract"),
+                    "content": doc.get("content"),
+                    "raw": doc,
+                }
+            )
+
+        return reports, None
+
+    except Exception as exc:
+        return [], str(exc)
+
+
+def fetch_report_by_id(report_id):
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(
+                f"{CMS_REPORTS_ENDPOINT}/{report_id}",
+                headers=get_cms_headers(),
+            )
+            response.raise_for_status()
+            doc = response.json()
+
+        return {
+            "id": doc.get("id"),
+            "title": doc.get("title", "Sans titre"),
+            "abstract": doc.get("abstract"),
+            "content": doc.get("content"),
+            "raw": doc,
+        }, None
+
+    except Exception as exc:
+        return None, str(exc)
+
+
+# ============================================================
+# CMS render helpers
+# ============================================================
+
+
+def lexical_to_html(value):
+    if not value:
+        return "<p><em>Aucun contenu</em></p>"
+
+    if isinstance(value, str):
+        return f"<p>{escape(value)}</p>"
+
+    root = value.get("root", {})
+    children = root.get("children", [])
+    html_parts = []
+
+    for node in children:
+        if node.get("type") == "paragraph":
+            text_parts = []
+            for child in node.get("children", []):
+                if child.get("type") == "text":
+                    text_parts.append(escape(child.get("text", "")))
+            paragraph = "".join(text_parts).strip()
+            if paragraph:
+                html_parts.append(f"<p>{paragraph}</p>")
+
+    return "".join(html_parts) if html_parts else "<p><em>Aucun contenu</em></p>"
+
+
+def build_superset_chart_url(chart_obj):
+    if not chart_obj or not isinstance(chart_obj, dict):
+        return None
+
+    chart_id = chart_obj.get("supersetChartId")
+    if not chart_id:
+        return None
+
+    return f"{SUPERSET_PUBLIC_URL}/superset/explore/?slice_id={chart_id}&standalone=1"
+
+
+def render_report_blocks(blocks):
+    if not blocks or not isinstance(blocks, list):
+        return "<p><em>Aucun bloc de contenu</em></p>"
+
+    html_parts = []
+
+    for block in blocks:
+        block_type = block.get("blockType")
+
+        if block_type == "report":
+            title = escape(block.get("title", ""))
+            head_text = escape(block.get("headText", ""))
+            chart = block.get("chart")
+            chart_url = build_superset_chart_url(chart)
+
+            block_html = ['<section class="report-block">']
+
+            if title:
+                block_html.append(f"<h3>{title}</h3>")
+
+            if head_text:
+                block_html.append(f"<p>{head_text}</p>")
+
+            if chart_url:
+                block_html.append(
+                    f'''
+                    <iframe
+                        class="report-iframe"
+                        src="{escape(chart_url, quote=True)}"
+                        allowfullscreen
+                        loading="lazy">
+                    </iframe>
+                    '''
+                )
+            else:
+                block_html.append(
+                    '<div class="note">Aucun graphique Superset trouvé pour ce bloc.</div>'
+                )
+
+            block_html.append("</section>")
+            html_parts.append("".join(block_html))
+        else:
+            html_parts.append(
+                f"<pre>{escape(json.dumps(block, ensure_ascii=False, indent=2))}</pre>"
+            )
+
+    return "".join(html_parts)
+
+
+# ============================================================
+# Superset helpers
+# ============================================================
+
+
+def is_valid_numeric_dashboard_id(value):
+    return value is not None and str(value).strip().isdigit()
+
+
+def validate_dashboards_config():
+    issues = []
+
+    for dash_key, dash in DASHBOARDS.items():
+        mode = dash.get("mode")
+        title = dash.get("title", f"dashboard_{dash_key}")
+
+        if mode in ["embed", "embed_group"]:
+            if not dash.get("embedded_dashboard_id"):
+                issues.append(f"[{title}] embedded_dashboard_id manquant")
+            if not is_valid_numeric_dashboard_id(dash.get("dashboard_numeric_id")):
+                issues.append(
+                    f"[{title}] dashboard_numeric_id invalide: {dash.get('dashboard_numeric_id')}"
+                )
+
+        if mode == "embed_group":
+            for tab in dash.get("subtabs", []):
+                label = tab.get("label", tab.get("key", "tab"))
+                if not tab.get("embedded_dashboard_id"):
+                    issues.append(f"[{title} > {label}] embedded_dashboard_id manquant")
+                if not is_valid_numeric_dashboard_id(tab.get("dashboard_numeric_id")):
+                    issues.append(
+                        f"[{title} > {label}] dashboard_numeric_id invalide: {tab.get('dashboard_numeric_id')}"
+                    )
+
+    return issues
+
+
+def superset_login_and_guest_token(dashboard_numeric_id, debug=False):
+    dashboard_numeric_id = str(dashboard_numeric_id).strip()
+
+    if not dashboard_numeric_id.isdigit():
+        raise RuntimeError(
+            f"dashboard_numeric_id invalide pour guest token: {dashboard_numeric_id}"
+        )
+
+    with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+        login_payload = {
+            "username": SUPERSET_USER,
+            "password": SUPERSET_PASSWORD,
+            "provider": "db",
+            "refresh": True,
+        }
+
+        login_resp = client.post(
+            f"{SUPERSET_API_URL}/api/v1/security/login",
+            json=login_payload,
+            headers={"Content-Type": "application/json"},
+        )
+
+        if debug:
+            print("\n=== LOGIN SUPERSET ===")
+            print("STATUS:", login_resp.status_code)
+            print("BODY:", login_resp.text)
+
+        login_resp.raise_for_status()
+        login_json = login_resp.json()
+        access_token = login_json.get("access_token")
+        if not access_token:
+            raise RuntimeError(f"Login Superset invalide: {login_json}")
+
+        csrf_resp = client.get(
+            f"{SUPERSET_API_URL}/api/v1/security/csrf_token/",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Referer": LOCAL_APP_ORIGIN,
+            },
+        )
+        csrf_resp.raise_for_status()
+
+        csrf_json = csrf_resp.json()
+        csrf_token = csrf_json.get("result")
+        if not csrf_token:
+            raise RuntimeError(f"Réponse CSRF invalide: {csrf_json}")
+
+        guest_payload = {
+            "resources": [{"type": "dashboard", "id": dashboard_numeric_id}],
+            "rls": [],
+            "user": {
+                "username": "embedded-user",
+                "first_name": "Embedded",
+                "last_name": "User",
+            },
+        }
+
+        guest_resp = client.post(
+            f"{SUPERSET_API_URL}/api/v1/security/guest_token/",
+            json=guest_payload,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "X-CSRFToken": csrf_token,
+                "Referer": LOCAL_APP_ORIGIN,
+                "Content-Type": "application/json",
+            },
+        )
+
+        if debug:
+            print("\n=== GUEST TOKEN ===")
+            print("STATUS:", guest_resp.status_code)
+            print("BODY:", guest_resp.text)
+            print("PAYLOAD:", json.dumps(guest_payload, ensure_ascii=False, indent=2))
+
+        guest_resp.raise_for_status()
+
+        guest_json = guest_resp.json()
+        token = guest_json.get("token")
+        if not token:
+            raise RuntimeError(f"Réponse guest token invalide: {guest_json}")
+
+        return token
+
+
+TEMPLATE = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>PrévizO</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    />
+
+    <style>
+        :root {
+            --bg: #f3f7fc;
+            --panel: rgba(255, 255, 255, 0.97);
+            --panel-solid: #ffffff;
+            --text: #16324f;
+            --text-soft: #35506d;
+            --muted: #6f8398;
+            --line: #dfe8f2;
+
+            --primary: #0b5ed7;
+            --primary-strong: #084298;
+            --primary-soft: #eaf2ff;
+
+            --accent: #f59e0b;
+            --success: #16a34a;
+            --danger: #dc2626;
+
+            --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+            --shadow-soft: 0 6px 14px rgba(15, 23, 42, 0.05);
+            --shadow-left: 0 14px 30px rgba(11, 94, 215, 0.09);
+
+            --radius: 14px;
+            --sidebar-width: 250px;
+            --page-padding: 10px;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+        }
+
+        body {
+            font-family: Inter, Arial, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, #eef5ff 0%, transparent 24%),
+                radial-gradient(circle at bottom right, #effaf5 0%, transparent 18%),
+                var(--bg);
+        }
+
+        .layout {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: var(--sidebar-width) 1fr;
+        }
+
+        .sidebar {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow: hidden;
+            padding: 8px;
+            border-right: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(246,250,255,0.98) 100%);
+            backdrop-filter: blur(12px);
+        }
+
+        .sidebar-inner {
+            height: calc(100vh - 16px);
+            display: grid;
+            grid-template-rows: auto auto 1fr auto;
+            gap: 8px;
+            overflow: hidden;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid rgba(223, 232, 242, 0.95);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+
+        .brand-card {
+            padding: 8px;
+        }
+
+        .brand-logo {
+            width: 100%;
+            height: 62px;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            background: linear-gradient(135deg, #eef5ff 0%, #ffffff 100%);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .brand-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #fff;
+        }
+
+        .brand-fallback {
+            font-size: 18px;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .mini-overview {
+            position: relative;
+            padding: 10px;
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(244,249,255,0.98) 100%);
+            box-shadow: var(--shadow-left);
+        }
+
+        .mini-overview::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary) 0%, #38bdf8 55%, #22c55e 100%);
+        }
+
+        .mini-overview::after {
+            content: "";
+            position: absolute;
+            width: 130px;
+            height: 130px;
+            top: -45px;
+            right: -45px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(11,94,215,0.09) 0%, rgba(11,94,215,0) 70%);
+            pointer-events: none;
+        }
+
+        .mini-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .mini-title-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .mini-title-text {
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1.2;
+            color: var(--text);
+        }
+
+        .mini-subtitle {
+            font-size: 10px;
+            color: var(--muted);
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 8px;
+            border-radius: 999px;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 900;
+            white-space: nowrap;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+        }
+
+        .mini-legend {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .mini-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 9px;
+            font-weight: 800;
+            color: var(--text-soft);
+            background: rgba(255,255,255,0.95);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 4px 6px;
+        }
+
+        .mini-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .basin-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 9px;
+            margin-bottom: 8px;
+            border-radius: 10px;
+            border: 1px solid #d9e6f8;
+            background: linear-gradient(135deg, #eef5ff 0%, #ffffff 100%);
+        }
+
+        .basin-left {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            min-width: 0;
+        }
+
+        .basin-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--muted);
+            font-weight: 900;
+        }
+
+        .basin-value {
+            font-size: 13px;
+            font-weight: 900;
+            color: var(--primary-strong);
+            line-height: 1.1;
+        }
+
+        .basin-badge {
+            padding: 4px 7px;
+            border-radius: 999px;
+            background: var(--primary);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 900;
+            box-shadow: 0 6px 12px rgba(11, 94, 215, 0.18);
+        }
+
+        #sensor-map {
+            width: 100%;
+            height: 100px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            margin-bottom: 8px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+        }
+
+        .mini-kpis {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+        }
+
+        .mini-kpi {
+            padding: 5px 6px;
+            border-radius: 9px;
+            background: #ffffff;
+            border: 1px solid #e5edf6;
+            box-shadow: var(--shadow-soft);
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .mini-kpi-label {
+            font-size: 8px;
+            font-weight: 700;
+            color: var(--muted);
+        }
+
+        .mini-kpi-value {
+            font-size: 12px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .nav-card {
+            padding: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .nav-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--muted);
+            font-weight: 900;
+            margin-bottom: 8px;
+            flex-shrink: 0;
+        }
+
+        .dashboard-list {
+            display: grid;
+            gap: 6px;
+        }
+
+        .sidebar-scroll {
+            overflow-y: auto;
+            min-height: 0;
+            padding-right: 2px;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: #c9d8ee;
+            border-radius: 999px;
+        }
+
+        .item {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+            padding: 8px 9px;
+            border-radius: 11px;
+            background: var(--panel-solid);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow-soft);
+            transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+        }
+
+        .item:hover {
+            transform: translateY(-1px);
+            border-color: #8fb4f3;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.07);
+        }
+
+        .item.active {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-strong) 100%);
+            border-color: var(--primary-strong);
+            color: #ffffff;
+            box-shadow: 0 10px 20px rgba(11, 94, 215, 0.22);
+        }
+
+        .item.active .item-title,
+        .item.active .item-subtitle {
+            color: #ffffff;
+        }
+
+        .item-title {
+            font-size: 11px;
+            font-weight: 900;
+            line-height: 1.2;
+        }
+
+        .item-subtitle {
+            margin-top: 2px;
+            font-size: 12px;
+            color: var(--text-soft);
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
+        .only-subtitle {
+            margin-top: 0;
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1.2;
+            color: inherit;
+        }
+
+        .bottom-link-card {
+            padding: 8px;
+            background: linear-gradient(135deg, #f5f8ff 0%, #fdf6ff 100%);
+            border: 1px solid #e7e9f8;
+        }
+
+        .bottom-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            text-decoration: none;
+            color: inherit;
+            background: #fff;
+            border: 1px solid #e6e8f5;
+            border-radius: 10px;
+            padding: 8px 10px;
+            box-shadow: var(--shadow-soft);
+            transition: transform .16s ease, box-shadow .16s ease;
+        }
+
+        .bottom-link:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 18px rgba(15, 23, 42, 0.07);
+        }
+
+        .bottom-link-left {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .bottom-link-kicker {
+            font-size: 8px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #7c3aed;
+            font-weight: 900;
+        }
+
+        .bottom-link-title {
+            font-size: 11px;
+            font-weight: 900;
+            color: var(--text);
+        }
+
+        .bottom-link-badge {
+            min-width: 26px;
+            height: 26px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+            color: #fff;
+            font-weight: 900;
+            font-size: 11px;
+        }
+
+        .main {
+            min-height: 100vh;
+            padding: var(--page-padding);
+            overflow: visible;
+        }
+
+        .main-inner {
+            display: grid;
+            gap: 10px;
+        }
+
+        .viewer-card {
+            overflow: visible;
+        }
+
+        .embed-head {
+            position: sticky;
+            top: 10px;
+            z-index: 40;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 16px 16px 12px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,0.97);
+            backdrop-filter: blur(12px);
+            border-top-left-radius: var(--radius);
+            border-top-right-radius: var(--radius);
+        }
+
+        .embed-kicker {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--primary);
+            font-weight: 900;
+            margin-bottom: 4px;
+        }
+
+        .embed-title {
+            font-size: 26px;
+            font-weight: 900;
+            line-height: 1.1;
+            color: #102947;
+            margin: 0;
+        }
+
+        .subtabs {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            width: 100%;
+        }
+
+        .subtab-btn {
+            appearance: none;
+            border: 1px solid #c9d8ee;
+            background: #ffffff;
+            color: var(--text-soft);
+            border-radius: 999px;
+            padding: 6px 11px;
+            font-size: 10px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all .16s ease;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .subtab-btn:hover {
+            transform: translateY(-1px);
+            border-color: #8fb4f3;
+            color: var(--primary-strong);
+            background: var(--primary-soft);
+        }
+
+        .subtab-btn.active {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-strong) 100%);
+            color: #fff;
+            border-color: var(--primary-strong);
+            box-shadow: 0 8px 18px rgba(11, 94, 215, 0.22);
+        }
+
+        .embed-status {
+            padding: 8px 14px;
+            background: #f8fbff;
+            color: #27486e;
+            border-bottom: 1px solid var(--line);
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .embed-status.error,
+        .error {
+            color: #a61b1b;
+            background: #fff2f2;
+            border-color: #f3c9c9;
+        }
+
+        #embedded-dashboard {
+            width: 100%;
+            min-height: 820px;
+            background: #fff;
+        }
+
+        iframe {
+            display: block;
+            width: 100%;
+            min-height: 820px;
+            border: none;
+            background: #fff;
+        }
+
+        .content-card {
+            padding: 18px;
+            overflow: auto;
+        }
+
+        .empty {
+            min-height: 420px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: var(--muted);
+            background: rgba(255,255,255,0.75);
+            border: 1px dashed #cdd8e6;
+            border-radius: 20px;
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .empty.dashboard-empty {
+            min-height: 78vh;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .empty.dashboard-empty .empty-title {
+            font-size: 28px;
+            font-weight: 900;
+            color: #1b3555;
+        }
+
+        .empty.dashboard-empty .empty-subtitle {
+            font-size: 15px;
+            color: var(--muted);
+            max-width: 520px;
+            line-height: 1.5;
+        }
+
+        .error {
+            padding: 14px;
+            border-radius: 14px;
+            border: 1px solid #f3c9c9;
+        }
+
+        .report-iframe {
+            width: 100%;
+            min-height: 680px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: #fff;
+            margin-top: 14px;
+        }
+
+        .meta {
+            margin-bottom: 16px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .section-title {
+            margin: 20px 0 12px;
+            font-size: 18px;
+            font-weight: 900;
+            color: var(--text);
+        }
+
+        .report-block {
+            margin-top: 24px;
+            padding-top: 18px;
+            border-top: 1px solid #edf2f7;
+        }
+
+        .report-block h3 {
+            margin: 0 0 10px;
+            font-size: 21px;
+            color: var(--text);
+        }
+
+        .report-block p,
+        .content-card p {
+            line-height: 1.65;
+            color: #31465b;
+            font-size: 15px;
+        }
+
+        pre {
+            background: #f7f9fc;
+            padding: 16px;
+            border-radius: 14px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border: 1px solid var(--line);
+        }
+
+        .leaflet-container {
+            font: inherit;
+        }
+
+        .custom-div-icon {
+            background: transparent;
+            border: none;
+        }
+
+        .marker-wrap {
+            width: 12px;
+            height: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .marker-symbol {
+            width: 12px;
+            height: 12px;
+            display: block;
+            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.18));
+        }
+
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+        }
+
+        @media (max-width: 1180px) {
+            :root {
+                --sidebar-width: 230px;
+            }
+
+            .embed-title {
+                font-size: 23px;
+            }
+        }
+
+        @media (max-width: 980px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: relative;
+                height: auto;
+                overflow: visible;
+                min-height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--line);
+            }
+
+            .sidebar-inner {
+                height: auto;
+                display: flex;
+                flex-direction: column;
+                overflow: visible;
+            }
+
+            .sidebar-scroll {
+                overflow: visible;
+            }
+
+            .main {
+                min-height: auto;
+            }
+
+            .embed-head {
+                position: relative;
+                top: 0;
+            }
+
+            #embedded-dashboard,
+            iframe {
+                min-height: 680px;
+            }
+
+            #sensor-map {
+                height: 130px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-inner">
+                <div class="card brand-card">
+                    <div class="brand-logo">
+                        {% if logo_url %}
+                            <img src="{{ logo_url }}" alt="Logo PrévizO">
+                        {% else %}
+                            <div class="brand-fallback">PZ</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card mini-overview">
+                    <div class="mini-title">
+                        <div class="mini-title-group">
+                            <div class="mini-title-text">Actualité</div>
+                        </div>
+
+                        <span class="status-pill" style="background: {{ station_stats.color }};">
+                            {{ station_stats.level }}
+                        </span>
+                    </div>
+
+                    <div class="mini-legend">
+                        <span class="mini-legend-item">
+                            <span class="mini-dot" style="background:#2563eb;"></span>Capteurs
+                        </span>
+                        <span class="mini-legend-item">
+                            <span class="mini-dot" style="background:#16a34a;"></span>Piézomètres
+                        </span>
+                        <span class="mini-legend-item">
+                            <span class="mini-dot" style="background:#f59e0b;"></span>Météo
+                        </span>
+                    </div>
+
+                    <div class="basin-indicator">
+                        <div class="basin-left">
+                            <span class="basin-label">Bassin</span>
+                            <span class="basin-value">Cheraval</span>
+                        </div>
+                        <span class="basin-badge">Actif</span>
+                    </div>
+
+                    <div id="sensor-map"></div>
+
+                    <div class="mini-kpis">
+                        <div class="mini-kpi">
+                            <span class="mini-kpi-label">Capteurs</span>
+                            <span class="mini-kpi-value">{{ station_stats.capteurs }}</span>
+                        </div>
+                        <div class="mini-kpi">
+                            <span class="mini-kpi-label">Piézomètres</span>
+                            <span class="mini-kpi-value">{{ station_stats.piezos }}</span>
+                        </div>
+                        <div class="mini-kpi">
+                            <span class="mini-kpi-label">Météo</span>
+                            <span class="mini-kpi-value">{{ station_stats.meteo }}</span>
+                        </div>
+                        <div class="mini-kpi">
+                            <span class="mini-kpi-label">Total</span>
+                            <span class="mini-kpi-value">{{ station_stats.total }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {% if mode == 'dashboards' %}
+                    <div class="card nav-card">
+                        <div class="nav-title">Dashboards</div>
+                        <div class="sidebar-scroll">
+                            <div class="dashboard-list">
+                                {% for dash_id, dash in dashboards.items() %}
+                                    <a href="/?mode=dashboards&id={{ dash_id }}"
+                                       class="item {% if selected_dashboard_id == dash_id %}active{% endif %}">
+                                        <div class="item-subtitle only-subtitle">{{ dash["subtitle"] }}</div>
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="card nav-card">
+                        <div class="nav-title">Rapports</div>
+                        {% if reports_error %}
+                            <div class="error">Erreur de chargement : {{ reports_error }}</div>
+                        {% else %}
+                            <div class="sidebar-scroll">
+                                <div class="dashboard-list">
+                                    {% for report in reports %}
+                                        <a href="/?mode=reports&report_id={{ report['id'] }}"
+                                           class="item {% if selected_report and selected_report['id'] == report['id'] %}active{% endif %}">
+                                            <div class="item-title">{{ report["title"] }}</div>
+                                        </a>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                <div class="card bottom-link-card">
+                    {% if mode == 'reports' %}
+                        <a class="bottom-link" href="/?mode=dashboards&id=1">
+                            <div class="bottom-link-left">
+                                <div class="bottom-link-kicker">Navigation opérationnelle</div>
+                                <div class="bottom-link-title">Dashboards</div>
+                            </div>
+                            <div class="bottom-link-badge">→</div>
+                        </a>
+                    {% else %}
+                        <a class="bottom-link" href="/?mode=reports">
+                            <div class="bottom-link-left">
+                                <div class="bottom-link-kicker">Lecture éditoriale</div>
+                                <div class="bottom-link-title">Rapports</div>
+                            </div>
+                            <div class="bottom-link-badge">→</div>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="main-inner">
+                {% if mode == 'dashboards' %}
+                    {% if selected_dashboard %}
+                        {% if selected_dashboard.get('mode') in ['embed', 'embed_group'] %}
+                            <div class="card viewer-card">
+                                <div class="embed-head">
+                                    
+                                    <div class="embed-title">{{ selected_dashboard["title"] }}</div>
+
+                                    {% if selected_dashboard.get('mode') == 'embed_group' and selected_dashboard.get('subtabs') %}
+                                        <div class="subtabs">
+                                            {% for tab in selected_dashboard.get('subtabs', []) %}
+                                                <button
+                                                    type="button"
+                                                    class="subtab-btn {% if loop.first %}active{% endif %}"
+                                                    data-embedded-id="{{ tab['embedded_dashboard_id'] }}"
+                                                    data-dashboard-id="{{ tab['dashboard_numeric_id'] }}"
+                                                    data-label="{{ tab['label'] }}"
+                                                >
+                                                    {{ tab['label'] }}
+                                                </button>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <div id="embed-status" class="embed-status">Chargement…</div>
+                                <div id="embedded-dashboard"></div>
+                            </div>
+                        {% else %}
+                            <div class="card viewer-card">
+                                <iframe src="{{ selected_dashboard['url'] }}" allowfullscreen loading="lazy"></iframe>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="empty dashboard-empty">
+                            <div class="empty-title">Aucun dashboard sélectionné</div>
+                            <div class="empty-subtitle">
+                                Cliquez sur un dashboard dans le menu de gauche pour l’afficher.
+                            </div>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    {% if selected_report %}
+                        <div class="card content-card">
+                            <div class="meta">ID : {{ selected_report["id"] }}</div>
+
+                            <div class="section-title">Résumé</div>
+                            {{ abstract_html|safe }}
+
+                            <div class="section-title">Contenu du rapport</div>
+                            {{ content_html|safe }}
+                        </div>
+                    {% elif reports_error %}
+                        <div class="card content-card">
+                            <div class="error">Impossible d'afficher les rapports : {{ reports_error }}</div>
+                        </div>
+                    {% else %}
+                        <div class="empty">Choisissez un rapport dans le menu</div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </main>
+    </div>
+
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin="">
+    </script>
+
+    {% if mode == 'dashboards' and selected_dashboard and selected_dashboard.get('mode') in ['embed', 'embed_group'] %}
+    <script src="https://unpkg.com/@superset-ui/embedded-sdk"></script>
+    {% endif %}
+
+    <script>
+        const sensorData = {{ sensor_points | tojson }};
+
+        function svgIconByType(type) {
+            if (type === "capteur") {
+                return `
+                    <svg class="marker-symbol" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="16" cy="16" r="10" fill="#2563eb" stroke="white" stroke-width="3"/>
+                        <circle cx="16" cy="16" r="3" fill="white"/>
+                    </svg>
+                `;
+            }
+
+            if (type === "piezo") {
+                return `
+                    <svg class="marker-symbol" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="8" y="6" width="16" height="20" rx="6" fill="#16a34a" stroke="white" stroke-width="3"/>
+                        <circle cx="16" cy="16" r="3" fill="white"/>
+                    </svg>
+                `;
+            }
+
+            if (type === "meteo") {
+                return `
+                    <svg class="marker-symbol" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                        <polygon points="16,4 27,26 5,26" fill="#f59e0b" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+                        <circle cx="16" cy="18" r="2.8" fill="white"/>
+                    </svg>
+                `;
+            }
+
+            return `
+                <svg class="marker-symbol" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="16" cy="16" r="10" fill="#64748b" stroke="white" stroke-width="3"/>
+                </svg>
+            `;
+        }
+
+        function iconForType(type) {
+            return L.divIcon({
+                className: "custom-div-icon",
+                html: `<div class="marker-wrap">${svgIconByType(type)}</div>`,
+                iconSize: [12, 12],
+                iconAnchor: [6, 6],
+                popupAnchor: [0, -6]
+            });
+        }
+
+        function initMap() {
+            const mapEl = document.getElementById("sensor-map");
+            if (!mapEl) return;
+
+            const map = L.map("sensor-map", {
+                zoomControl: true,
+                scrollWheelZoom: false,
+                dragging: true,
+                attributionControl: false
+            });
+
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19
+            }).addTo(map);
+
+            const bounds = [];
+
+            sensorData.forEach((p) => {
+                if (p.latitude == null || p.longitude == null) return;
+
+                const popupParts = [
+                    `<strong>${p.name || "Station"}</strong>`,
+                    `<div>Type : ${p.type || "-"}</div>`,
+                    `<div>Code : ${p.code || "-"}</div>`
+                ];
+
+                if (p.altitude_m != null) {
+                    popupParts.push(`<div>Altitude : ${p.altitude_m} m</div>`);
+                }
+
+                if (p.url) {
+                    popupParts.push(
+                        `<div><a href="${p.url}" target="_blank" rel="noopener noreferrer">Voir la fiche</a></div>`
+                    );
+                }
+
+                L.marker([p.latitude, p.longitude], {
+                    icon: iconForType(p.type)
+                })
+                .addTo(map)
+                .bindPopup(popupParts.join(""));
+
+                bounds.push([p.latitude, p.longitude]);
+            });
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [16, 16] });
+            } else {
+                map.setView([47.37, 0.72], 8);
+            }
+
+            setTimeout(() => map.invalidateSize(), 250);
+            window.addEventListener("resize", () => map.invalidateSize());
+        }
+    </script>
+
+    {% if mode == 'dashboards' and selected_dashboard and selected_dashboard.get('mode') in ['embed', 'embed_group'] %}
+    <script>
+        const EMBED_MODE = {{ selected_dashboard.get('mode') | tojson }};
+        const SUPERSET_PUBLIC_URL = {{ superset_public_url | tojson }};
+        const DEFAULT_EMBEDDED_ID = {{ default_embedded_id | tojson }};
+        const DEFAULT_DASHBOARD_NUMERIC_ID = {{ default_dashboard_numeric_id | tojson }};
+
+        async function fetchGuestToken(dashboardNumericId) {
+            const response = await fetch(`/api/guest_token?dashboard_id=${encodeURIComponent(dashboardNumericId)}`);
+            const data = await response.json();
+
+            if (!response.ok || data.error) {
+                throw new Error(data.error || "Impossible de récupérer le guest token");
+            }
+
+            return data.token;
+        }
+
+        function setStatus(message, isError = false) {
+            const statusBox = document.getElementById("embed-status");
+            if (!statusBox) return;
+            statusBox.style.display = "block";
+            statusBox.className = isError ? "embed-status error" : "embed-status";
+            statusBox.textContent = message;
+        }
+
+        async function mountDashboard(embeddedId, dashboardNumericId, label = "") {
+            const mountPoint = document.getElementById("embedded-dashboard");
+            if (!mountPoint) return;
+
+            const embedDashboard =
+                (window.supersetEmbeddedSdk && window.supersetEmbeddedSdk.embedDashboard) ||
+                window.embedDashboard;
+
+            if (!embedDashboard) {
+                setStatus("SDK Superset introuvable.", true);
+                return;
+            }
+
+            const cleanEmbeddedId = String(embeddedId || "").trim();
+            const cleanDashboardId = String(dashboardNumericId || "").trim();
+
+            if (!cleanEmbeddedId) {
+                setStatus(`Configuration incomplète : embeddedId manquant${label ? " pour " + label : ""}`, true);
+                return;
+            }
+
+            if (!/^\\d+$/.test(cleanDashboardId)) {
+                setStatus(
+                    `Configuration invalide : dashboard_numeric_id manquant ou non numérique (${cleanDashboardId || "-"})${label ? " pour " + label : ""}`,
+                    true
+                );
+                return;
+            }
+
+            console.log("Mount dashboard:", {
+                label,
+                embeddedId: cleanEmbeddedId,
+                dashboardNumericId: cleanDashboardId
+            });
+
+            mountPoint.innerHTML = "";
+            setStatus(`Chargement du dashboard${label ? " : " + label : ""}…`, false);
+
+            try {
+                const token = await fetchGuestToken(cleanDashboardId);
+
+                await embedDashboard({
+                    id: cleanEmbeddedId,
+                    supersetDomain: SUPERSET_PUBLIC_URL,
+                    mountPoint: mountPoint,
+                    fetchGuestToken: async () => token,
+                    dashboardUiConfig: {
+                        hideTitle: true,
+                        hideChartControls: true,
+                        hideTab: false,
+                        filters: { expanded: false }
+                    }
+                });
+
+                const statusBox = document.getElementById("embed-status");
+                if (statusBox) {
+                    statusBox.style.display = "none";
+                }
+            } catch (error) {
+                setStatus(
+                    `Erreur embed SDK${label ? " (" + label + ")" : ""} : ${String(error)}`,
+                    true
+                );
+                console.error(error);
+            }
+        }
+
+        async function initEmbeddedArea() {
+            if (!DEFAULT_EMBEDDED_ID || !DEFAULT_DASHBOARD_NUMERIC_ID) {
+                setStatus("Configuration dashboard incomplète.", true);
+                return;
+            }
+
+            await mountDashboard(DEFAULT_EMBEDDED_ID, DEFAULT_DASHBOARD_NUMERIC_ID, "onglet par défaut");
+
+            if (EMBED_MODE === "embed_group") {
+                const buttons = document.querySelectorAll(".subtab-btn");
+
+                buttons.forEach((button) => {
+                    button.addEventListener("click", async () => {
+                        buttons.forEach((btn) => btn.classList.remove("active"));
+                        button.classList.add("active");
+
+                        const embeddedId = button.dataset.embeddedId;
+                        const dashboardId = button.dataset.dashboardId;
+                        const label = button.dataset.label || "";
+
+                        await mountDashboard(embeddedId, dashboardId, label);
+                    });
+                });
+            }
+        }
+    </script>
+    {% endif %}
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            initMap();
+
+            {% if mode == 'dashboards' and selected_dashboard and selected_dashboard.get('mode') in ['embed', 'embed_group'] %}
+            try {
+                await initEmbeddedArea();
+            } catch (error) {
+                const statusBox = document.getElementById("embed-status");
+                if (statusBox) {
+                    statusBox.style.display = "block";
+                    statusBox.className = "embed-status error";
+                    statusBox.textContent = "Erreur embed SDK : " + String(error);
+                }
+                console.error(error);
+            }
+            {% endif %}
+        });
+    </script>
+</body>
+</html>
+"""
+
+# ============================================================
+# Routes
+# ============================================================
+
+
+@app.route("/api/guest_token")
+def api_guest_token():
+    try:
+        dashboard_id = request.args.get("dashboard_id")
+        if not dashboard_id:
+            return jsonify({"error": "dashboard_id manquant"}), 400
+
+        dashboard_id = str(dashboard_id).strip()
+        if not dashboard_id:
+            return jsonify({"error": "dashboard_id vide"}), 400
+
+        if not dashboard_id.isdigit():
+            return jsonify({"error": f"dashboard_id invalide: {dashboard_id}"}), 400
+
+        token = superset_login_and_guest_token(dashboard_id, debug=True)
+        return jsonify({"token": token})
+
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/sensors")
+def api_sensors():
+    return jsonify(SENSOR_DATASET)
+
+
+@app.route("/api/debug_dashboards")
+def api_debug_dashboards():
+    issues = validate_dashboards_config()
+
+    return jsonify(
+        {
+            "issues": issues,
+            "dashboards": DASHBOARDS,
+            "summary": {
+                "capteurs_home_embedded_id": CAPTEURS_HOME_EMBEDDED_ID,
+                "capteurs_home_dashboard_numeric_id": CAPTEURS_HOME_DASHBOARD_NUMERIC_ID,
+                "piezo_global_embedded_id": PIEZO_GLOBAL_EMBEDDED_ID,
+                "piezo_global_dashboard_numeric_id": PIEZO_GLOBAL_DASHBOARD_NUMERIC_ID,
+                "piezo_hydro_embedded_id": PIEZO_HYDRO_EMBEDDED_ID,
+                "piezo_hydro_dashboard_numeric_id": PIEZO_HYDRO_DASHBOARD_NUMERIC_ID,
+                "prevision_global_embedded_id": PREVISION_GLOBAL_EMBEDDED_ID,
+                "prevision_global_dashboard_numeric_id": PREVISION_GLOBAL_DASHBOARD_NUMERIC_ID,
+                "prevision_15j_embedded_id": PREVISION_15J_EMBEDDED_ID,
+                "prevision_15j_dashboard_numeric_id": PREVISION_15J_DASHBOARD_NUMERIC_ID,
+                "prevision_6m_embedded_id": PREVISION_6M_EMBEDDED_ID,
+                "prevision_6m_dashboard_numeric_id": PREVISION_6M_DASHBOARD_NUMERIC_ID,
+                "climat_global_embedded_id": CLIMAT_GLOBAL_EMBEDDED_ID,
+                "climat_global_dashboard_numeric_id": CLIMAT_GLOBAL_DASHBOARD_NUMERIC_ID,
+            },
+        }
+    )
+
+
+@app.route("/health")
+def health():
+    reports, reports_error = fetch_reports()
+    return {
+        "status": "ok",
+        "cms_base_url": API_URL,
+        "cms_reports_endpoint": CMS_REPORTS_ENDPOINT,
+        "reports_count": len(reports),
+        "reports_error": reports_error,
+        "dashboards": DASHBOARDS,
+        "dashboards_issues": validate_dashboards_config(),
+        "superset_public_url": SUPERSET_PUBLIC_URL,
+        "superset_api_url": SUPERSET_API_URL,
+        "local_app_origin": LOCAL_APP_ORIGIN,
+        "sensor_points": len(SENSOR_DATASET),
+        "station_stats": STATION_STATS,
+    }
+
+
+@app.route("/")
+def index():
+    mode = request.args.get("mode", "dashboards")
+
+    selected_dashboard_id = request.args.get("id", default=1, type=int)
+    selected_dashboard = DASHBOARDS.get(selected_dashboard_id)
+
+    reports, reports_error = fetch_reports()
+    report_id = request.args.get("report_id")
+    selected_report = None
+
+    if mode == "reports" and report_id:
+        selected_report, report_error = fetch_report_by_id(report_id)
+        if report_error:
+            reports_error = report_error
+
+    abstract_html = lexical_to_html(selected_report.get("abstract")) if selected_report else ""
+    content_html = render_report_blocks(selected_report.get("content")) if selected_report else ""
+
+    default_embedded_id = None
+    default_dashboard_numeric_id = None
+
+    if selected_dashboard:
+        if selected_dashboard.get("mode") == "embed_group":
+            subtabs = selected_dashboard.get("subtabs", [])
+            if subtabs:
+                default_embedded_id = subtabs[0].get("embedded_dashboard_id")
+                default_dashboard_numeric_id = subtabs[0].get("dashboard_numeric_id")
+        elif selected_dashboard.get("mode") == "embed":
+            default_embedded_id = selected_dashboard.get("embedded_dashboard_id")
+            default_dashboard_numeric_id = selected_dashboard.get("dashboard_numeric_id")
+
+    return render_template_string(
+        TEMPLATE,
+        mode=mode,
+        dashboards=DASHBOARDS,
+        selected_dashboard_id=selected_dashboard_id,
+        selected_dashboard=selected_dashboard,
+        reports=reports,
+        reports_error=reports_error,
+        selected_report=selected_report,
+        abstract_html=abstract_html,
+        content_html=content_html,
+        superset_public_url=SUPERSET_PUBLIC_URL,
+        local_app_origin=LOCAL_APP_ORIGIN,
+        sensor_points=SENSOR_DATASET,
+        station_stats=STATION_STATS,
+        default_embedded_id=default_embedded_id,
+        default_dashboard_numeric_id=default_dashboard_numeric_id,
+        logo_url=LOGO_URL,
+    )
+
+
+if __name__ == "__main__":
+    issues = validate_dashboards_config()
+
+    print("=" * 60)
+    print("🚀 FLASK DASHBOARDS + RAPPORTS CMS + KPI OVERVIEW")
+    print("=" * 60)
+    print(f"CMS_BASE_URL = {API_URL}")
+    print(f"CMS_REPORTS_ENDPOINT = {CMS_REPORTS_ENDPOINT}")
+    print(f"SUPERSET_PUBLIC_URL = {SUPERSET_PUBLIC_URL}")
+    print(f"SUPERSET_API_URL = {SUPERSET_API_URL}")
+    print(f"LOCAL_APP_ORIGIN = {LOCAL_APP_ORIGIN}")
+    print(f"SENSOR_POINTS = {len(SENSOR_DATASET)}")
+    print(f"LOGO_URL = {LOGO_URL}")
+    print("-" * 60)
+    print(f"CAPTEURS_HOME_DASHBOARD_NUMERIC_ID = {CAPTEURS_HOME_DASHBOARD_NUMERIC_ID}")
+    print(f"CAPTEURS_HOME_EMBEDDED_ID = {CAPTEURS_HOME_EMBEDDED_ID}")
+    print(f"PIEZO_GLOBAL_DASHBOARD_NUMERIC_ID = {PIEZO_GLOBAL_DASHBOARD_NUMERIC_ID}")
+    print(f"PIEZO_GLOBAL_EMBEDDED_ID = {PIEZO_GLOBAL_EMBEDDED_ID}")
+    print(f"PIEZO_HYDRO_DASHBOARD_NUMERIC_ID = {PIEZO_HYDRO_DASHBOARD_NUMERIC_ID}")
+    print(f"PIEZO_HYDRO_EMBEDDED_ID = {PIEZO_HYDRO_EMBEDDED_ID}")
+    print(f"PREVISION_GLOBAL_DASHBOARD_NUMERIC_ID = {PREVISION_GLOBAL_DASHBOARD_NUMERIC_ID}")
+    print(f"PREVISION_GLOBAL_EMBEDDED_ID = {PREVISION_GLOBAL_EMBEDDED_ID}")
+    print(f"PREVISION_15J_DASHBOARD_NUMERIC_ID = {PREVISION_15J_DASHBOARD_NUMERIC_ID}")
+    print(f"PREVISION_15J_EMBEDDED_ID = {PREVISION_15J_EMBEDDED_ID}")
+    print(f"PREVISION_6M_DASHBOARD_NUMERIC_ID = {PREVISION_6M_DASHBOARD_NUMERIC_ID}")
+    print(f"PREVISION_6M_EMBEDDED_ID = {PREVISION_6M_EMBEDDED_ID}")
+    print(f"CLIMAT_GLOBAL_DASHBOARD_NUMERIC_ID = {CLIMAT_GLOBAL_DASHBOARD_NUMERIC_ID}")
+    print(f"CLIMAT_GLOBAL_EMBEDDED_ID = {CLIMAT_GLOBAL_EMBEDDED_ID}")
+    print("-" * 60)
+
+    if issues:
+        print("⚠️ CONFIGURATION DASHBOARDS :")
+        for issue in issues:
+            print(" -", issue)
+    else:
+        print("✅ Configuration dashboards OK")
+
+    print("-" * 60)
+    print(f"🌐 http://localhost:{APP_PORT}")
+    print(f"🩺 Debug dashboards : http://localhost:{APP_PORT}/api/debug_dashboards")
+    print(f"💚 Health           : http://localhost:{APP_PORT}/health")
+    print("=" * 60)
+
+    app.run(host="0.0.0.0", port=APP_PORT, debug=True)

@@ -1,0 +1,14 @@
+import requests
+
+url = "http://ollama:11434/api/generate"
+
+payload = {
+    "model": "qwen2.5vl:3b",
+    "prompt": "Explain a chart in one sentence",
+    "stream": False
+}
+
+response = requests.post(url, json=payload, timeout=300)
+
+print("Status:", response.status_code)
+print("Response:", response.json()["response"])

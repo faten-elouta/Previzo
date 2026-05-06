@@ -1,4 +1,5 @@
 # Sandbox - Previzo X contenu éditorial
+<img width="818" height="384" alt="image" src="https://github.com/user-attachments/assets/dc600b3b-36c1-430d-a08a-f99906fa4b8b" />
 
 ## Objectifs
 
